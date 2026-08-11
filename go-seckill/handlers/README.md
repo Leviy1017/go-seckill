@@ -1,0 +1,1 @@
+前端发请求 → handlers接收 → 调用database的CRUD → MySQL/Redis存取数据 → handler组装JSON返回前端
