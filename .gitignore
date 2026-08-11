@@ -1,0 +1,15 @@
+# 配置文件（含密码/API Key，不应提交）
+config.env
+*.env
+
+# Go
+*.exe
+*.log
+seckill
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统
+.DS_Store

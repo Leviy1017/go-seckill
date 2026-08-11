@@ -1,0 +1,7 @@
+config.env
+*.log
+seckill
+*.exe
+.DS_Store
+docker-compose.override.yml
+Ground/
