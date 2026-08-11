@@ -1,0 +1,108 @@
+version: "3.8"
+
+# ============================================================
+# 秒杀系统 Docker Compose 编排
+# ============================================================
+# 启动方式 (在项目根目录 /go-seckill 执行):
+#   docker-compose -f docker/docker-compose.yml up -d
+# 停止方式:
+#   docker-compose -f docker/docker-compose.yml down
+# 查看日志:
+#   docker-compose -f docker/docker-compose.yml logs -f app
+# ============================================================
+
+services:
+  # ---- MySQL 数据库 ----
+  mysql:
+    image: mysql:8.0
+    container_name: seckill-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: seckill
+      MYSQL_CHARSET: utf8mb4
+      MYSQL_COLLATION: utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      # 数据持久化
+      - mysql_data:/var/lib/mysql
+      # 自定义字符集配置
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      timeout: 10s
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - seckill-net
+
+  # ---- Redis 缓存 ----
+  redis:
+    image: redis:7-alpine
+    container_name: seckill-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      # 数据持久化（AOF）
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      interval: 10s
+      retries: 10
+      start_period: 10s
+    networks:
+      - seckill-net
+
+  # ---- Go 秒杀服务 ----
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: seckill-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # 服务端口
+      PORT: "8080"
+      # MySQL 配置（连接 docker 网络内的 mysql 容器）
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: seckill
+      # Redis 配置（连接 docker 网络内的 redis 容器）
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      # JWT 密钥（生产环境请更换为复杂密钥）
+      JWT_SECRET: go-seckill-secret-key-2024
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - seckill-net
+
+# ---- 数据卷 ----
+volumes:
+  mysql_data:
+    name: seckill-mysql-data
+  redis_data:
+    name: seckill-redis-data
+
+# ---- 网络 ----
+networks:
+  seckill-net:
+    name: seckill-net
+    driver: bridge
